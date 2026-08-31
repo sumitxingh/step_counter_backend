@@ -25,6 +25,7 @@ jobs:
   deploy:
     needs: ci
     runs-on: [self-hosted, macOS]
+    environment: Dev
     env:
       IMAGE: step-counter-backend
       TAG: ${{ github.sha }}
