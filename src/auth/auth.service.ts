@@ -10,7 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'crypto';
-import { Repository } from 'typeorm';
+import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { PasswordResetToken } from './password-reset-token.entity';
 import { EmailService } from './email.service';
@@ -35,28 +35,45 @@ export class AuthService {
     return this.jwt.sign({ sub: user.id, role: user.role });
   }
 
+  private normalizeEmail(email: string) {
+    return email.trim().toLowerCase();
+  }
+
   private sanitize(user: User) {
     const { password_hash: _password_hash, ...rest } = user;
     return rest;
   }
 
   async register(dto: RegisterDto) {
-    const existing = await this.users.findOne({ where: { email: dto.email } });
+    const email = this.normalizeEmail(dto.email);
+    const existing = await this.users.findOne({ where: { email } });
     if (existing) throw new ConflictException('Email already registered');
 
     const password_hash = await bcrypt.hash(dto.password, 10);
-    const user = await this.users.save(
-      this.users.create({
-        full_name: dto.full_name,
-        email: dto.email,
-        password_hash,
-      }),
-    );
+    let user: User;
+    try {
+      user = await this.users.save(
+        this.users.create({
+          full_name: dto.full_name,
+          email,
+          password_hash,
+        }),
+      );
+    } catch (err) {
+      if (
+        err instanceof QueryFailedError &&
+        (err as { code?: string }).code === '23505'
+      ) {
+        throw new ConflictException('Email already registered');
+      }
+      throw err;
+    }
     return { access_token: this.signToken(user), user: this.sanitize(user) };
   }
 
   async login(dto: LoginDto) {
-    const user = await this.users.findOne({ where: { email: dto.email } });
+    const email = this.normalizeEmail(dto.email);
+    const user = await this.users.findOne({ where: { email } });
     if (!user || !(await bcrypt.compare(dto.password, user.password_hash))) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -68,7 +85,8 @@ export class AuthService {
     return { access_token: this.signToken(user), user: this.sanitize(user) };
   }
 
-  async forgotPassword(email: string) {
+  async forgotPassword(rawEmail: string) {
+    const email = this.normalizeEmail(rawEmail);
     const user = await this.users.findOne({ where: { email } });
     if (user) {
       const token = randomBytes(32).toString('hex');
@@ -101,8 +119,10 @@ export class AuthService {
     const user = await this.users.findOneByOrFail({ id: record.user_id });
     user.password_hash = await bcrypt.hash(dto.new_password, 10);
     await this.users.save(user);
-    record.used_at = new Date();
-    await this.resetTokens.save(record);
+    await this.resetTokens.update(
+      { user_id: record.user_id, used_at: IsNull() },
+      { used_at: new Date() },
+    );
     return { message: 'Password reset successful' };
   }
 }
