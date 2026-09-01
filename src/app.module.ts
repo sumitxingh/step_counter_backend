@@ -25,9 +25,11 @@ import { AdminModule } from './admin/admin.module';
         const isProd = config.get<string>('NODE_ENV') === 'production';
         return {
           pinoHttp: {
-            level: config.get<string>('LOG_LEVEL') ?? (isProd ? 'info' : 'debug'),
+            level:
+              config.get<string>('LOG_LEVEL') ?? (isProd ? 'info' : 'debug'),
             redact: ['req.headers.authorization', 'req.headers.cookie'],
-            transport: isProd ? undefined
+            transport: isProd
+              ? undefined
               : { target: 'pino-pretty', options: { singleLine: false } },
           },
         };
@@ -40,7 +42,7 @@ import { AdminModule } from './admin/admin.module';
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
         entities: [User, StepEntry, Notification, PasswordResetToken],
-        synchronize: config.get<string>('NODE_ENV') !== 'production',
+        synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
       }),
     }),
     AuthModule,

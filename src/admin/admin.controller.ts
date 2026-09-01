@@ -8,8 +8,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { parseQueryInt } from '../common/parse-query-int';
 import { AdminService } from './admin.service';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+
+const MAX_DAYS = 365;
 
 @Controller('admin')
 @UseGuards(AdminGuard)
@@ -28,8 +31,8 @@ export class AdminController {
     @Query('search') search?: string,
   ) {
     return this.admin.listUsers(
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 20,
+      parseQueryInt(page, 1),
+      parseQueryInt(limit, 20, { max: 100 }),
       search,
     );
   }
@@ -46,11 +49,11 @@ export class AdminController {
 
   @Get('stats/signups')
   statsSignups(@Query('days') days?: string) {
-    return this.admin.statsSignups(days ? Number(days) : 30);
+    return this.admin.statsSignups(parseQueryInt(days, 30, { max: MAX_DAYS }));
   }
 
   @Get('stats/steps')
   statsSteps(@Query('days') days?: string) {
-    return this.admin.statsSteps(days ? Number(days) : 30);
+    return this.admin.statsSteps(parseQueryInt(days, 30, { max: MAX_DAYS }));
   }
 }

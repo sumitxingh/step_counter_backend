@@ -1,8 +1,11 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { parseQueryInt } from '../common/parse-query-int';
 import type { JwtPayload } from '../auth/jwt.strategy';
 import { StepsService } from './steps.service';
 import { SyncStepsDto } from './dto/sync-steps.dto';
+
+const MAX_DAYS = 365;
 
 @Controller('steps')
 export class StepsController {
@@ -20,11 +23,17 @@ export class StepsController {
 
   @Get('history')
   history(@CurrentUser() user: JwtPayload, @Query('days') days?: string) {
-    return this.steps.history(user.sub, days ? Number(days) : 30);
+    return this.steps.history(
+      user.sub,
+      parseQueryInt(days, 30, { max: MAX_DAYS }),
+    );
   }
 
   @Get('report')
   report(@CurrentUser() user: JwtPayload, @Query('days') days?: string) {
-    return this.steps.report(user.sub, days ? Number(days) : 7);
+    return this.steps.report(
+      user.sub,
+      parseQueryInt(days, 7, { max: MAX_DAYS }),
+    );
   }
 }
