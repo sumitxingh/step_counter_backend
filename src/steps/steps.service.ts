@@ -4,6 +4,40 @@ import { MoreThanOrEqual, Repository } from 'typeorm';
 import { StepEntry } from './step-entry.entity';
 import { User } from '../users/user.entity';
 import { SyncStepsDto } from './dto/sync-steps.dto';
+import {
+  LEADERBOARD_LIMIT,
+  leaderboardStartDate,
+  shapeLeaderboard,
+  type LeaderboardPeriod,
+  type LeaderboardRawRow,
+} from './leaderboard.util';
+
+// Postgres-specific: FILTER, RANK() window, and a CTE. One round-trip returns
+// the top N plus the requesting user's own row (even if outside the top N).
+const LEADERBOARD_SQL = `
+  WITH ranked AS (
+    SELECT
+      u.id,
+      u.full_name,
+      COUNT(*) FILTER (WHERE s.step_count >= u.daily_goal_steps)::int AS goal_days,
+      COALESCE(SUM(s.step_count), 0)::int AS total_steps,
+      RANK() OVER (
+        ORDER BY
+          COUNT(*) FILTER (WHERE s.step_count >= u.daily_goal_steps) DESC,
+          COALESCE(SUM(s.step_count), 0) DESC
+      )::int AS rank
+    FROM step_entries s
+    JOIN users u ON u.id = s.user_id
+    WHERE u.is_active = true
+      AND u.role <> 'admin'
+      AND ($1::date IS NULL OR s.entry_date >= $1::date)
+    GROUP BY u.id, u.full_name
+  )
+  SELECT id, full_name, goal_days, total_steps, rank
+  FROM ranked
+  WHERE rank <= $2 OR id = $3
+  ORDER BY rank
+`;
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
@@ -58,6 +92,17 @@ export class StepsService {
       entry_date,
       step_count,
     }));
+  }
+
+  async leaderboard(userId: string, period: LeaderboardPeriod) {
+    const start = leaderboardStartDate(period);
+    const rows: LeaderboardRawRow[] = await this.steps.query(LEADERBOARD_SQL, [
+      start,
+      LEADERBOARD_LIMIT,
+      userId,
+    ]);
+    const { top, me } = shapeLeaderboard(rows, userId, LEADERBOARD_LIMIT);
+    return { period, generated_at: new Date().toISOString(), top, me };
   }
 
   async report(userId: string, days: number) {
