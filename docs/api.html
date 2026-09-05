@@ -1,0 +1,960 @@
+<title>Step Counter API</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #f7f8fa;
+    --surface: #ffffff;
+    --surface-2: #f3f5f8;
+    --ink: #1b1e24;
+    --ink-soft: #444a54;
+    --muted: #6b7482;
+    --border: #e3e6ec;
+    --border-strong: #cfd4dd;
+    --accent: #35618e;
+    --accent-ink: #ffffff;
+    --accent-soft: #e9eff6;
+    --get: #2c6ca3;
+    --post: #2f7d52;
+    --patch: #9a6412;
+    --danger: #b23b3b;
+    --shadow: 0 1px 2px rgba(20,28,40,.04), 0 8px 24px -12px rgba(20,28,40,.12);
+
+    --f-display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+    --f-body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #121417;
+      --surface: #1a1d21;
+      --surface-2: #21262c;
+      --ink: #e8eaed;
+      --ink-soft: #b3b8c0;
+      --muted: #868d99;
+      --border: #2b3037;
+      --border-strong: #3a414a;
+      --accent: #6ea3d8;
+      --accent-ink: #10131a;
+      --accent-soft: #1e2a38;
+      --get: #6bb0e0;
+      --post: #6fc593;
+      --patch: #d6a45f;
+      --danger: #e07a7a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #121417;
+    --surface: #1a1d21;
+    --surface-2: #21262c;
+    --ink: #e8eaed;
+    --ink-soft: #b3b8c0;
+    --muted: #868d99;
+    --border: #2b3037;
+    --border-strong: #3a414a;
+    --accent: #6ea3d8;
+    --accent-ink: #10131a;
+    --accent-soft: #1e2a38;
+    --get: #6bb0e0;
+    --post: #6fc593;
+    --patch: #d6a45f;
+    --danger: #e07a7a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.55);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0 clamp(1rem, 4vw, 2.5rem);
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    gap: clamp(1.5rem, 5vw, 4rem);
+    align-items: start;
+  }
+
+  /* ---------- sidebar ---------- */
+  .side {
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+    padding: 2rem 0;
+    font-size: 13.5px;
+  }
+  .side .brand {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -.01em;
+    color: var(--ink);
+    margin: 0 0 .25rem;
+  }
+  .side .brand span { color: var(--accent); }
+  .side .ver {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+  .side nav ul { list-style: none; margin: 0 0 1.25rem; padding: 0; }
+  .side nav .grp {
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    margin: 1.4rem 0 .5rem;
+  }
+  .side nav a {
+    display: block;
+    padding: .28rem .6rem;
+    margin-left: -.6rem;
+    border-radius: 6px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+  }
+  .side nav a code {
+    font-family: var(--f-mono);
+    font-size: 12px;
+  }
+  .side nav a:hover { background: var(--surface-2); color: var(--ink); }
+  .side nav a.active {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-left-color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* ---------- main ---------- */
+  main { padding: 2rem 0 6rem; min-width: 0; }
+
+  .masthead { margin-bottom: 2.5rem; }
+  .masthead h1 {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    letter-spacing: -.025em;
+    line-height: 1.05;
+    text-wrap: balance;
+    margin: 0 0 .6rem;
+  }
+  .masthead .lede {
+    font-size: 16px;
+    color: var(--ink-soft);
+    max-width: 60ch;
+    margin: 0 0 1.5rem;
+  }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .meta-grid div {
+    background: var(--surface);
+    padding: .75rem .9rem;
+  }
+  .meta-grid dt {
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .meta-grid dd {
+    margin: .15rem 0 0;
+    font-family: var(--f-mono);
+    font-size: 12.5px;
+    color: var(--ink);
+    word-break: break-word;
+  }
+
+  h2.sec {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 1.5rem;
+    letter-spacing: -.02em;
+    margin: 3.5rem 0 .4rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+  h2.sec:first-of-type { border-top: none; }
+  .sec-note { color: var(--muted); margin: 0 0 1.5rem; font-size: 14px; }
+
+  /* ---------- endpoint card ---------- */
+  .ep {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.4rem 1.5rem 1.5rem;
+    margin: 1.1rem 0;
+    box-shadow: var(--shadow);
+    scroll-margin-top: 1.5rem;
+  }
+  .ep-head {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    flex-wrap: wrap;
+  }
+  .m {
+    font-family: var(--f-mono);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: .04em;
+    padding: .22rem .5rem;
+    border-radius: 5px;
+    color: var(--accent-ink);
+  }
+  .m.get { background: var(--get); }
+  .m.post { background: var(--post); }
+  .m.patch { background: var(--patch); }
+  .path {
+    font-family: var(--f-mono);
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--ink);
+    word-break: break-all;
+  }
+  .auth {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 500;
+    padding: .18rem .5rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .auth.user { color: var(--accent); border-color: var(--accent); }
+  .auth.admin { color: var(--danger); border-color: var(--danger); }
+
+  .ep-desc { margin: .9rem 0 0; color: var(--ink-soft); }
+
+  .ep h4 {
+    font-family: var(--f-body);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    margin: 1.5rem 0 .5rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .status {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: .1rem .4rem;
+    border-radius: 4px;
+    letter-spacing: 0;
+  }
+
+  .code {
+    position: relative;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .code pre {
+    margin: 0;
+    padding: .9rem 1rem;
+    overflow-x: auto;
+    font-family: var(--f-mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+  }
+  .code .copy {
+    position: absolute;
+    top: .5rem;
+    right: .5rem;
+    font-family: var(--f-body);
+    font-size: 11px;
+    padding: .25rem .5rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .12s ease;
+  }
+  .code:hover .copy, .code .copy:focus-visible { opacity: 1; }
+  .code .copy:hover { color: var(--ink); border-color: var(--accent); }
+
+  p.note {
+    margin: .6rem 0 0;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  p.note code, .ep-desc code, li code, td code, .sec-note code {
+    font-family: var(--f-mono);
+    font-size: .85em;
+    background: var(--surface-2);
+    padding: .08rem .32rem;
+    border-radius: 4px;
+    color: var(--ink);
+  }
+
+  ul.errs { margin: .3rem 0 0; padding-left: 0; list-style: none; }
+  ul.errs li {
+    padding: .3rem 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  ul.errs li:last-child { border-bottom: none; }
+  .tag {
+    display: inline-block;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 2.4rem;
+    text-align: center;
+    padding: .1rem .35rem;
+    border-radius: 4px;
+    margin-right: .5rem;
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+    color: var(--danger);
+  }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: .85rem 1rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1.2rem 0;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  .callout strong { color: var(--ink); }
+  .callout.warn {
+    border-left-color: var(--patch);
+    background: color-mix(in srgb, var(--patch) 12%, transparent);
+  }
+
+  /* ---------- tables ---------- */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td {
+    text-align: left;
+    padding: .55rem .8rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  th {
+    background: var(--surface-2);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.wrap-cell { white-space: normal; min-width: 16rem; }
+  td .m { font-size: 10px; }
+  .font-mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+  .theme-btn {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10;
+    font-family: var(--f-body);
+    font-size: 12px;
+    padding: .4rem .7rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink-soft);
+    cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  .theme-btn:hover { color: var(--ink); border-color: var(--accent); }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; }
+    .side {
+      position: static;
+      max-height: none;
+      padding: 1.5rem 0 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .side nav { columns: 2; column-gap: 1.5rem; }
+    main { padding-top: 1.5rem; }
+  }
+</style>
+
+<button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle color theme">Theme</button>
+
+<div class="wrap">
+  <aside class="side">
+    <p class="brand">Step Counter<span>API</span></p>
+    <p class="ver">v0.0.1 &middot; NestJS &middot; REST</p>
+    <nav id="toc">
+      <p class="grp">Getting started</p>
+      <ul>
+        <li><a href="#conventions">Conventions</a></li>
+        <li><a href="#errors">Error shape</a></li>
+      </ul>
+      <p class="grp">Auth</p>
+      <ul>
+        <li><a href="#auth-register"><code>POST</code> /auth/register</a></li>
+        <li><a href="#auth-login"><code>POST</code> /auth/login</a></li>
+        <li><a href="#auth-forgot"><code>POST</code> /auth/forgot-password</a></li>
+        <li><a href="#auth-reset"><code>POST</code> /auth/reset-password</a></li>
+      </ul>
+      <p class="grp">Users</p>
+      <ul>
+        <li><a href="#users-me"><code>GET</code> /users/me</a></li>
+        <li><a href="#users-patch"><code>PATCH</code> /users/me</a></li>
+        <li><a href="#users-goal"><code>PATCH</code> /users/me/goal</a></li>
+      </ul>
+      <p class="grp">Steps</p>
+      <ul>
+        <li><a href="#steps-today"><code>GET</code> /steps/today</a></li>
+        <li><a href="#steps-sync"><code>POST</code> /steps/sync</a></li>
+        <li><a href="#steps-history"><code>GET</code> /steps/history</a></li>
+        <li><a href="#steps-report"><code>GET</code> /steps/report</a></li>
+      </ul>
+      <p class="grp">Notifications</p>
+      <ul>
+        <li><a href="#notifications"><code>GET</code> /notifications</a></li>
+      </ul>
+      <p class="grp">Admin</p>
+      <ul>
+        <li><a href="#admin-overview"><code>GET</code> /admin/overview</a></li>
+        <li><a href="#admin-users"><code>GET</code> /admin/users</a></li>
+        <li><a href="#admin-user"><code>GET</code> /admin/users/:id</a></li>
+        <li><a href="#admin-user-patch"><code>PATCH</code> /admin/users/:id</a></li>
+        <li><a href="#admin-signups"><code>GET</code> /admin/stats/signups</a></li>
+        <li><a href="#admin-steps"><code>GET</code> /admin/stats/steps</a></li>
+      </ul>
+      <p class="grp">Reference</p>
+      <ul>
+        <li><a href="#quick">Quick reference</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main>
+    <header class="masthead">
+      <h1>Step Counter API</h1>
+      <p class="lede">REST reference for the mobile app and the internal admin dashboard. Mirrors the running implementation &mdash; see <code>docs/design.md</code> for rationale and <code>docs/postman/</code> for a runnable collection.</p>
+      <dl class="meta-grid">
+        <div><dt>Base URL</dt><dd>http://localhost:3000</dd></div>
+        <div><dt>Auth</dt><dd>Bearer &lt;access_token&gt;</dd></div>
+        <div><dt>Casing</dt><dd>snake_case everywhere</dd></div>
+        <div><dt>Content-Type</dt><dd>application/json</dd></div>
+        <div><dt>Token TTL</dt><dd>7 days &middot; no refresh</dd></div>
+        <div><dt>Errors</dt><dd>{ status_code, message, error }</dd></div>
+      </dl>
+    </header>
+
+    <section id="conventions">
+      <h2 class="sec">Conventions</h2>
+      <p class="sec-note">Applies to every endpoint unless noted otherwise.</p>
+      <ul class="errs" style="font-size:14px">
+        <li>Every route except the four under <code>/auth/*</code> requires <code>Authorization: Bearer &lt;access_token&gt;</code>.</li>
+        <li>All fields are <code>snake_case</code> &mdash; request bodies, responses, query params, everywhere. No camelCase.</li>
+        <li><strong>Unknown fields are silently dropped</strong>, not rejected. A typo'd field name won't 400 &mdash; it just won't be saved. Check names against this doc if a change isn't taking effect.</li>
+        <li><code>password_hash</code> is never returned on any user object.</li>
+        <li>Timestamps (<code>created_at</code>, <code>updated_at</code>, <code>last_login_at</code>) are ISO 8601. <code>entry_date</code> is a plain <code>YYYY-MM-DD</code> date, no time component.</li>
+        <li>Pagination / window params (<code>page</code>, <code>limit</code>, <code>days</code>) are query strings, not body fields. All optional with per-endpoint defaults.</li>
+      </ul>
+    </section>
+
+    <section id="errors">
+      <h2 class="sec">Error shape</h2>
+      <p class="sec-note">Every non-2xx response uses this shape.</p>
+      <div class="code">
+        <button class="copy" type="button">Copy</button>
+        <pre>{
+  "status_code": 400,
+  "message": "Invalid credentials",
+  "error": "BAD_REQUEST"
+}</pre>
+      </div>
+      <p class="note">Validation errors (<code>400</code>) return <code>message</code> as an <strong>array</strong> of strings, one per failed rule &mdash; e.g. <code>["email must be an email", "password must be longer than or equal to 8 characters"]</code>. Every other error returns <code>message</code> as a single string.</p>
+      <div class="tbl-wrap" style="margin-top:1rem">
+        <table>
+          <thead><tr><th>Status</th><th>error</th><th class="wrap-cell">When</th></tr></thead>
+          <tbody>
+            <tr><td class="font-mono">400</td><td class="font-mono">BAD_REQUEST</td><td class="wrap-cell">Request body failed validation</td></tr>
+            <tr><td class="font-mono">401</td><td class="font-mono">UNAUTHORIZED</td><td class="wrap-cell">Missing / invalid / expired token, or wrong login credentials</td></tr>
+            <tr><td class="font-mono">403</td><td class="font-mono">FORBIDDEN</td><td class="wrap-cell">Valid token but insufficient role (non-admin on <code>/admin/*</code>), or <code>is_active = false</code> at login</td></tr>
+            <tr><td class="font-mono">404</td><td class="font-mono">NOT_FOUND</td><td class="wrap-cell">Resource doesn't exist</td></tr>
+            <tr><td class="font-mono">409</td><td class="font-mono">CONFLICT</td><td class="wrap-cell">e.g. registering an email already in use</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <h2 class="sec">Auth</h2>
+    <p class="sec-note">No token required. <code>full_name</code> / <code>email</code> / <code>password</code> are required unless marked optional.</p>
+
+    <article class="ep" id="auth-register">
+      <div class="ep-head">
+        <span class="m post">POST</span><span class="path">/auth/register</span>
+        <span class="auth none">No auth</span>
+      </div>
+      <p class="ep-desc">Create an account. Returns an access token and the new user. <code>password</code> must be &ge; 8 characters.</p>
+      <h4>Request</h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "full_name": "Jane Doe",
+  "email": "jane@example.com",
+  "password": "password123"
+}</pre></div>
+      <h4>Response <span class="status">201</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "user": {
+    "id": "39d76e58-4557-45e8-8e54-fd6d1535e384",
+    "full_name": "Jane Doe",
+    "email": "jane@example.com",
+    "age": null,
+    "gender": null,
+    "height_cm": null,
+    "weight_kg": null,
+    "daily_goal_steps": 8000,
+    "role": "user",
+    "is_active": true,
+    "last_login_at": null,
+    "created_at": "2026-08-21T16:12:25.796Z",
+    "updated_at": "2026-08-21T16:12:25.796Z"
+  }
+}</pre></div>
+      <h4>Errors</h4>
+      <ul class="errs">
+        <li><span class="tag">400</span> invalid payload</li>
+        <li><span class="tag">409</span> email already registered</li>
+      </ul>
+      <p class="note">Store <code>access_token</code> in secure storage (e.g. <code>flutter_secure_storage</code>) and send it as <code>Authorization: Bearer &lt;token&gt;</code> on every later request. Expires in 7 days &mdash; there is no refresh flow, re-login when it expires.</p>
+    </article>
+
+    <article class="ep" id="auth-login">
+      <div class="ep-head">
+        <span class="m post">POST</span><span class="path">/auth/login</span>
+        <span class="auth none">No auth</span>
+      </div>
+      <p class="ep-desc">Exchange credentials for a token. Response is the same shape as Register. <code>last_login_at</code> is stamped on every successful login.</p>
+      <h4>Request</h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "email": "jane@example.com",
+  "password": "password123"
+}</pre></div>
+      <h4>Response <span class="status">201</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{ "access_token": "eyJ...", "user": { /* same shape as Register */ } }</pre></div>
+      <h4>Errors</h4>
+      <ul class="errs">
+        <li><span class="tag">401</span> wrong email or password &mdash; same error for both, doesn't reveal which</li>
+        <li><span class="tag">403</span> account disabled (<code>is_active = false</code>)</li>
+      </ul>
+    </article>
+
+    <article class="ep" id="auth-forgot">
+      <div class="ep-head">
+        <span class="m post">POST</span><span class="path">/auth/forgot-password</span>
+        <span class="auth none">No auth</span>
+      </div>
+      <p class="ep-desc">Request a password-reset token by email.</p>
+      <h4>Request</h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{ "email": "jane@example.com" }</pre></div>
+      <h4>Response <span class="status">201</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{ "message": "If that email exists, a reset link has been sent" }</pre></div>
+      <p class="note"><strong>Always the same response</strong>, whether or not the email exists, to avoid leaking which emails are registered. If it exists, a reset token is emailed and expires after <code>RESET_TOKEN_TTL_MIN</code> (30 min in local dev). The client can't check token status &mdash; the UI should just say &ldquo;check your email&rdquo;.</p>
+    </article>
+
+    <article class="ep" id="auth-reset">
+      <div class="ep-head">
+        <span class="m post">POST</span><span class="path">/auth/reset-password</span>
+        <span class="auth none">No auth</span>
+      </div>
+      <p class="ep-desc">Set a new password using the token from the reset email. <code>new_password</code> must be &ge; 8 characters.</p>
+      <h4>Request</h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "token": "the-token-from-the-email",
+  "new_password": "newpassword123"
+}</pre></div>
+      <h4>Response <span class="status">201</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{ "message": "Password reset successful" }</pre></div>
+      <h4>Errors</h4>
+      <ul class="errs"><li><span class="tag">401</span> token invalid, expired, or already used</li></ul>
+    </article>
+
+    <h2 class="sec">Users</h2>
+    <p class="sec-note">All require a bearer token. There is no <code>:id</code> param &mdash; these always act on the logged-in user, derived from the token.</p>
+
+    <article class="ep" id="users-me">
+      <div class="ep-head">
+        <span class="m get">GET</span><span class="path">/users/me</span>
+        <span class="auth user">User</span>
+      </div>
+      <p class="ep-desc">Full profile of the current user. Same object as the <code>user</code> in Register / Login, without the wrapping keys.</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "id": "39d76e58-4557-45e8-8e54-fd6d1535e384",
+  "full_name": "Jane Doe",
+  "email": "jane@example.com",
+  "age": 28,
+  "gender": "female",
+  "height_cm": 165,
+  "weight_kg": 60,
+  "daily_goal_steps": 8000,
+  "role": "user",
+  "is_active": true,
+  "last_login_at": "2026-08-21T16:13:57.321Z",
+  "created_at": "2026-08-21T16:12:25.796Z",
+  "updated_at": "2026-08-21T16:13:57.323Z"
+}</pre></div>
+    </article>
+
+    <article class="ep" id="users-patch">
+      <div class="ep-head">
+        <span class="m patch">PATCH</span><span class="path">/users/me</span>
+        <span class="auth user">User</span>
+      </div>
+      <p class="ep-desc">Update profile fields. All optional &mdash; send only what changed.</p>
+      <h4>Request</h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "age": 28,
+  "gender": "female",
+  "height_cm": 165,
+  "weight_kg": 60
+}</pre></div>
+      <p class="note"><code>gender</code> is free-text &mdash; the API doesn't constrain it to an enum, send whatever the app's picker uses.</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{ /* full updated user, same shape as GET /users/me */ }</pre></div>
+      <h4>Errors</h4>
+      <ul class="errs"><li><span class="tag">400</span> <code>age</code> / <code>height_cm</code> / <code>weight_kg</code> sent but not numbers</li></ul>
+    </article>
+
+    <article class="ep" id="users-goal">
+      <div class="ep-head">
+        <span class="m patch">PATCH</span><span class="path">/users/me/goal</span>
+        <span class="auth user">User</span>
+      </div>
+      <p class="ep-desc">Set the daily step goal. Must be an integer &ge; 1.</p>
+      <h4>Request</h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{ "daily_goal_steps": 10000 }</pre></div>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{ /* full updated user */ }</pre></div>
+      <h4>Errors</h4>
+      <ul class="errs"><li><span class="tag">400</span> missing, non-integer, or &lt; 1</li></ul>
+      <div class="callout">There is <strong>no</strong> <code>/users/me/goal/recommended</code> endpoint. The &ldquo;recommended daily steps from height / weight / age&rdquo; calculation is deliberately client-side &mdash; pure arithmetic the app computes on-device. Compute it locally and <code>PATCH</code> the result here.</div>
+    </article>
+
+    <h2 class="sec">Steps</h2>
+    <p class="sec-note">All require a bearer token, all act on the logged-in user.</p>
+
+    <article class="ep" id="steps-today">
+      <div class="ep-head">
+        <span class="m get">GET</span><span class="path">/steps/today</span>
+        <span class="auth user">User</span>
+      </div>
+      <p class="ep-desc">Today's progress against the current goal.</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{ "goal": 8000, "today": 4200 }</pre></div>
+      <p class="note"><code>goal</code> is the user's current <code>daily_goal_steps</code>. <code>today</code> is <code>0</code> if nothing has been synced yet today.</p>
+    </article>
+
+    <article class="ep" id="steps-sync">
+      <div class="ep-head">
+        <span class="m post">POST</span><span class="path">/steps/sync</span>
+        <span class="auth user">User</span>
+      </div>
+      <p class="ep-desc">Upsert a step count for a date. Safe to call repeatedly for the same <code>entry_date</code> &mdash; the <strong>latest value for a date always wins</strong>, it does not add to the previous value. <code>entry_date</code> must be <code>YYYY-MM-DD</code>; <code>step_count</code> must be an integer &ge; 0.</p>
+      <h4>Request</h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "entry_date": "2026-08-21",
+  "step_count": 4200
+}</pre></div>
+      <h4>Response <span class="status">201</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "id": "2451c88d-3c60-41df-aa91-965227340385",
+  "user_id": "39d76e58-4557-45e8-8e54-fd6d1535e384",
+  "entry_date": "2026-08-21",
+  "step_count": 4200,
+  "created_at": "2026-08-21T16:12:25.941Z",
+  "updated_at": "2026-08-21T16:12:25.941Z"
+}</pre></div>
+      <p class="note">On a repeat sync for the same date, <code>id</code> and <code>created_at</code> stay the same; <code>step_count</code> and <code>updated_at</code> change.</p>
+      <h4>Errors</h4>
+      <ul class="errs"><li><span class="tag">400</span> bad date format or negative <code>step_count</code></li></ul>
+    </article>
+
+    <article class="ep" id="steps-history">
+      <div class="ep-head">
+        <span class="m get">GET</span><span class="path">/steps/history?days=30</span>
+        <span class="auth user">User</span>
+      </div>
+      <p class="ep-desc">Raw daily entries, newest first. <code>days</code> (optional, default <code>30</code>) is a rolling window back from today.</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>[
+  { "entry_date": "2026-08-21", "step_count": 4200 },
+  { "entry_date": "2026-08-20", "step_count": 6100 }
+]</pre></div>
+      <p class="note">Only dates with a synced entry appear &mdash; no zero-filled gaps for missing days.</p>
+    </article>
+
+    <article class="ep" id="steps-report">
+      <div class="ep-head">
+        <span class="m get">GET</span><span class="path">/steps/report?days=7</span>
+        <span class="auth user">User</span>
+      </div>
+      <p class="ep-desc">Rolling-window summary. Use <code>days=7</code> for &ldquo;this week&rdquo;, <code>days=30</code> for &ldquo;this month&rdquo;, or any custom window. <code>days</code> defaults to <code>7</code>.</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "period_days": 7,
+  "days_logged": 5,
+  "total_steps": 28400,
+  "avg_daily_steps": 5680
+}</pre></div>
+      <ul class="errs">
+        <li><code>days_logged</code> &mdash; how many of the <code>period_days</code> actually have a synced entry, not the window size.</li>
+        <li><code>avg_daily_steps</code> &mdash; <code>total_steps / days_logged</code>, rounded. Averages over days <em>with data</em>, so it isn't dragged down by days with no sync.</li>
+        <li>If nothing was synced in the window, <code>days_logged</code> and <code>total_steps</code> are <code>0</code> and <code>avg_daily_steps</code> is <code>0</code>.</li>
+      </ul>
+    </article>
+
+    <h2 class="sec">Notifications</h2>
+    <p class="sec-note">Requires a bearer token.</p>
+
+    <article class="ep" id="notifications">
+      <div class="ep-head">
+        <span class="m get">GET</span><span class="path">/notifications</span>
+        <span class="auth user">User</span>
+      </div>
+      <p class="ep-desc">The current user's notifications, newest first.</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>[
+  {
+    "id": "b1f2...",
+    "user_id": "39d76e58-4557-45e8-8e54-fd6d1535e384",
+    "title": "Goal reached!",
+    "body": "You hit 10,000 steps today.",
+    "type": "achievement",
+    "created_at": "2026-08-21T09:00:00.000Z"
+  }
+]</pre></div>
+      <p class="note"><code>type</code> is one of <code>"achievement" | "reminder" | "summary"</code>.</p>
+      <div class="callout warn"><strong>Nothing generates notification rows server-side yet</strong> &mdash; no cron, no push, no automatic &ldquo;goal reached&rdquo; trigger. This endpoint returns <code>[]</code> for every user right now. It's wired up and ready, but there is no producer. Don't build UI that assumes a steady stream until that lands &mdash; flag it if it blocks a screen. Relative time (&ldquo;2h ago&rdquo;) is client-side too; format from the ISO timestamp.</div>
+    </article>
+
+    <h2 class="sec">Admin</h2>
+    <p class="sec-note">Requires a bearer token whose user has <code>role: "admin"</code>. There is no admin signup &mdash; accounts are promoted by hand in the database. A non-admin token gets <code>403</code> on every route below. These return cross-user aggregate / list data for an internal dashboard, not anything scoped to the current user.</p>
+
+    <article class="ep" id="admin-overview">
+      <div class="ep-head">
+        <span class="m get">GET</span><span class="path">/admin/overview</span>
+        <span class="auth admin">Admin</span>
+      </div>
+      <p class="ep-desc">Top-line platform metrics.</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "total_users": 1042,
+  "new_users_today": 6,
+  "new_users_7d": 41,
+  "new_users_30d": 210,
+  "active_users_7d": 388,
+  "active_users_30d": 701,
+  "total_steps_logged": 812345000,
+  "avg_daily_steps_7d": 6210,
+  "goal_completion_rate_7d": 0.34
+}</pre></div>
+      <ul class="errs">
+        <li>&ldquo;Active&rdquo; = synced at least one <code>step_entries</code> row in that window.</li>
+        <li><code>avg_daily_steps_7d</code> averages over logged entries in the last 7 days across all users, not per-user.</li>
+        <li><code>goal_completion_rate_7d</code> &mdash; fraction (<code>0</code>&ndash;<code>1</code>) of (user, day) rows in the last 7 days meeting that user's <strong>current</strong> <code>daily_goal_steps</code>. There's no goal-history table, so a user who recently raised their goal shows past days as &ldquo;missed&rdquo; against the new target.</li>
+      </ul>
+    </article>
+
+    <article class="ep" id="admin-users">
+      <div class="ep-head">
+        <span class="m get">GET</span><span class="path">/admin/users?page=1&amp;limit=20&amp;search=</span>
+        <span class="auth admin">Admin</span>
+      </div>
+      <p class="ep-desc">Paginated user list, newest-registered first. <code>page</code> (default <code>1</code>), <code>limit</code> (default <code>20</code>), <code>search</code> (optional, case-insensitive substring match on <code>full_name</code> or <code>email</code>).</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "items": [ /* full user objects, same shape as GET /users/me */ ],
+  "total": 1042,
+  "page": 1,
+  "limit": 20
+}</pre></div>
+    </article>
+
+    <article class="ep" id="admin-user">
+      <div class="ep-head">
+        <span class="m get">GET</span><span class="path">/admin/users/:id</span>
+        <span class="auth admin">Admin</span>
+      </div>
+      <p class="ep-desc">One user's profile plus their last 30 days of step entries.</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{
+  "id": "...",
+  "full_name": "Jane Doe",
+  "...": "...same fields as GET /users/me...",
+  "step_entries": [
+    { "entry_date": "2026-08-21", "step_count": 4200 }
+  ]
+}</pre></div>
+      <h4>Errors</h4>
+      <ul class="errs"><li><span class="tag">404</span> <code>:id</code> doesn't exist</li></ul>
+    </article>
+
+    <article class="ep" id="admin-user-patch">
+      <div class="ep-head">
+        <span class="m patch">PATCH</span><span class="path">/admin/users/:id</span>
+        <span class="auth admin">Admin</span>
+      </div>
+      <p class="ep-desc">The only admin write. Enables or disables an account.</p>
+      <h4>Request</h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{ "is_active": false }</pre></div>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>{ /* full updated user */ }</pre></div>
+      <div class="callout warn">Disabling a user does <strong>not</strong> invalidate their existing token &mdash; a token issued before disabling keeps working until it expires (role / <code>is_active</code> aren't re-checked per request, only at login). It does block their next <code>/auth/login</code> with a <code>403</code>.</div>
+      <h4>Errors</h4>
+      <ul class="errs"><li><span class="tag">404</span> <code>:id</code> doesn't exist</li></ul>
+    </article>
+
+    <article class="ep" id="admin-signups">
+      <div class="ep-head">
+        <span class="m get">GET</span><span class="path">/admin/stats/signups?days=30</span>
+        <span class="auth admin">Admin</span>
+      </div>
+      <p class="ep-desc">Signups per day, oldest first. <code>days</code> defaults to <code>30</code>. One entry per day that had &ge; 1 signup &mdash; no zero-filled gaps.</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>[
+  { "date": "2026-08-20", "count": 3 },
+  { "date": "2026-08-21", "count": 6 }
+]</pre></div>
+    </article>
+
+    <article class="ep" id="admin-steps">
+      <div class="ep-head">
+        <span class="m get">GET</span><span class="path">/admin/stats/steps?days=30</span>
+        <span class="auth admin">Admin</span>
+      </div>
+      <p class="ep-desc">Step totals per day, oldest first. <code>days</code> defaults to <code>30</code>. One entry per day that had &ge; 1 sync &mdash; no zero-filled gaps.</p>
+      <h4>Response <span class="status">200</span></h4>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>[
+  { "date": "2026-08-20", "total_steps": 812345, "active_users": 140 },
+  { "date": "2026-08-21", "total_steps": 903221, "active_users": 152 }
+]</pre></div>
+      <p class="note"><code>total_steps</code> sums <code>step_count</code> across all users for that date. <code>active_users</code> counts distinct users who synced that date.</p>
+    </article>
+
+    <section id="quick">
+      <h2 class="sec">Quick reference</h2>
+      <p class="sec-note">Auth column: &mdash; none &middot; <span style="color:var(--accent)">user</span> token &middot; <span style="color:var(--danger)">admin</span> token.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th class="wrap-cell">Body</th></tr></thead>
+          <tbody>
+            <tr><td><span class="m post">POST</span></td><td class="font-mono">/auth/register</td><td>&mdash;</td><td class="wrap-cell font-mono">full_name, email, password</td></tr>
+            <tr><td><span class="m post">POST</span></td><td class="font-mono">/auth/login</td><td>&mdash;</td><td class="wrap-cell font-mono">email, password</td></tr>
+            <tr><td><span class="m post">POST</span></td><td class="font-mono">/auth/forgot-password</td><td>&mdash;</td><td class="wrap-cell font-mono">email</td></tr>
+            <tr><td><span class="m post">POST</span></td><td class="font-mono">/auth/reset-password</td><td>&mdash;</td><td class="wrap-cell font-mono">token, new_password</td></tr>
+            <tr><td><span class="m get">GET</span></td><td class="font-mono">/users/me</td><td style="color:var(--accent)">user</td><td class="wrap-cell">&mdash;</td></tr>
+            <tr><td><span class="m patch">PATCH</span></td><td class="font-mono">/users/me</td><td style="color:var(--accent)">user</td><td class="wrap-cell font-mono">age?, gender?, height_cm?, weight_kg?</td></tr>
+            <tr><td><span class="m patch">PATCH</span></td><td class="font-mono">/users/me/goal</td><td style="color:var(--accent)">user</td><td class="wrap-cell font-mono">daily_goal_steps</td></tr>
+            <tr><td><span class="m get">GET</span></td><td class="font-mono">/steps/today</td><td style="color:var(--accent)">user</td><td class="wrap-cell">&mdash;</td></tr>
+            <tr><td><span class="m post">POST</span></td><td class="font-mono">/steps/sync</td><td style="color:var(--accent)">user</td><td class="wrap-cell font-mono">entry_date, step_count</td></tr>
+            <tr><td><span class="m get">GET</span></td><td class="font-mono">/steps/history?days=</td><td style="color:var(--accent)">user</td><td class="wrap-cell">&mdash;</td></tr>
+            <tr><td><span class="m get">GET</span></td><td class="font-mono">/steps/report?days=</td><td style="color:var(--accent)">user</td><td class="wrap-cell">&mdash;</td></tr>
+            <tr><td><span class="m get">GET</span></td><td class="font-mono">/notifications</td><td style="color:var(--accent)">user</td><td class="wrap-cell">&mdash;</td></tr>
+            <tr><td><span class="m get">GET</span></td><td class="font-mono">/admin/overview</td><td style="color:var(--danger)">admin</td><td class="wrap-cell">&mdash;</td></tr>
+            <tr><td><span class="m get">GET</span></td><td class="font-mono">/admin/users?page=&amp;limit=&amp;search=</td><td style="color:var(--danger)">admin</td><td class="wrap-cell">&mdash;</td></tr>
+            <tr><td><span class="m get">GET</span></td><td class="font-mono">/admin/users/:id</td><td style="color:var(--danger)">admin</td><td class="wrap-cell">&mdash;</td></tr>
+            <tr><td><span class="m patch">PATCH</span></td><td class="font-mono">/admin/users/:id</td><td style="color:var(--danger)">admin</td><td class="wrap-cell font-mono">is_active</td></tr>
+            <tr><td><span class="m get">GET</span></td><td class="font-mono">/admin/stats/signups?days=</td><td style="color:var(--danger)">admin</td><td class="wrap-cell">&mdash;</td></tr>
+            <tr><td><span class="m get">GET</span></td><td class="font-mono">/admin/stats/steps?days=</td><td style="color:var(--danger)">admin</td><td class="wrap-cell">&mdash;</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var btn = document.getElementById("themeBtn");
+    var KEY = "sc-api-theme";
+    var stored = null;
+    try { stored = localStorage.getItem(KEY); } catch (e) {}
+    if (stored === "light" || stored === "dark") root.setAttribute("data-theme", stored);
+
+    function current() {
+      var t = root.getAttribute("data-theme");
+      if (t) return t;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    function label() { btn.textContent = current() === "dark" ? "Light mode" : "Dark mode"; }
+    label();
+    btn.addEventListener("click", function () {
+      var next = current() === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem(KEY, next); } catch (e) {}
+      label();
+    });
+
+    // copy buttons
+    document.querySelectorAll(".code .copy").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var pre = b.parentElement.querySelector("pre");
+        if (!pre) return;
+        navigator.clipboard.writeText(pre.innerText).then(function () {
+          var old = b.textContent;
+          b.textContent = "Copied";
+          setTimeout(function () { b.textContent = old; }, 1400);
+        }).catch(function () {});
+      });
+    });
+
+    // scrollspy
+    var links = Array.prototype.slice.call(document.querySelectorAll("#toc a"));
+    var byId = {};
+    links.forEach(function (l) { byId[l.getAttribute("href").slice(1)] = l; });
+    var targets = Object.keys(byId).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        links.forEach(function (l) { l.classList.remove("active"); });
+        var a = byId[en.target.id];
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "0px 0px -75% 0px", threshold: 0 });
+    targets.forEach(function (t) { io.observe(t); });
+  })();
+</script>

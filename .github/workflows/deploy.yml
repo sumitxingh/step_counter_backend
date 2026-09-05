@@ -1,0 +1,67 @@
+name: Deploy
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    runs-on: [self-hosted, macOS]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  deploy:
+    needs: ci
+    runs-on: [self-hosted, macOS]
+    environment: Dev
+    env:
+      IMAGE: step-counter-backend
+      TAG: ${{ github.sha }}
+      REMOTE: ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image for linux/amd64
+        run: docker buildx build --platform linux/amd64 -t "$IMAGE:$TAG" --load .
+
+      - name: Prepare SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Ship image to EC2
+        run: |
+          docker save "$IMAGE:$TAG" | gzip | \
+            ssh -i ~/.ssh/deploy_key "$REMOTE" 'gunzip | docker load'
+
+      - name: Restart container
+        run: |
+          ssh -i ~/.ssh/deploy_key "$REMOTE" "
+            docker rm -f $IMAGE 2>/dev/null || true &&
+            docker run -d --name $IMAGE --restart unless-stopped \
+              -p 8006:8006 --env-file /opt/step-counter/.env $IMAGE:$TAG &&
+            docker image prune -f
+          "
+
+      - name: Health check
+        run: |
+          sleep 5
+          ssh -i ~/.ssh/deploy_key "$REMOTE" "curl -fsS http://localhost:8006/ >/dev/null"
+
+      - name: Clean up local image
+        if: always()
+        run: docker rmi "$IMAGE:$TAG" || true

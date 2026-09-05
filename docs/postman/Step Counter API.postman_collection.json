@@ -1,0 +1,1079 @@
+{
+  "info": {
+    "name": "Step Counter API",
+    "description": "Endpoints per docs/design.md. Full run order: Auth > Users > Steps > Notifications > Admin. Run via `npm run test:api` (see scripts/test-api.sh) or manually in Postman with the 'Step Counter - Local' environment selected.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set('gen_email', `e2e+${Date.now()}@test.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('has access_token', () => pm.expect(body.access_token).to.be.a('string'));",
+                  "pm.test('email matches sent value', () => pm.expect(body.user.email).to.eql(pm.environment.get('gen_email')));",
+                  "pm.test('role defaults to user', () => pm.expect(body.user.role).to.eql('user'));",
+                  "pm.test('is_active defaults true', () => pm.expect(body.user.is_active).to.eql(true));",
+                  "pm.test('daily_goal_steps defaults to 8000', () => pm.expect(body.user.daily_goal_steps).to.eql(8000));",
+                  "pm.test('password_hash is never returned', () => pm.expect(body.user.password_hash).to.be.undefined);",
+                  "pm.environment.set('access_token', body.access_token);",
+                  "pm.environment.set('user_id', body.user.id);",
+                  "pm.environment.set('user_email', body.user.email);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Test User\",\n  \"email\": \"{{gen_email}}\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register - duplicate email is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "const body = pm.response.json();",
+                  "pm.test('error body shape', () => {",
+                  "  pm.expect(body.status_code).to.eql(409);",
+                  "  pm.expect(body.error).to.eql('CONFLICT');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Test User\",\n  \"email\": \"{{gen_email}}\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register - invalid payload is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test('message is an array of validation errors', () => pm.expect(body.message).to.be.an('array').that.is.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('has access_token', () => pm.expect(body.access_token).to.be.a('string'));",
+                  "pm.test('last_login_at is stamped', () => pm.expect(body.user.last_login_at).to.not.be.null);",
+                  "pm.environment.set('access_token', body.access_token);",
+                  "pm.environment.set('user_id', body.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login - wrong password is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"wrong-password\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login - unknown email is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nobody-{{$timestamp}}@test.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('generic message returned', () => pm.expect(body.message).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/forgot-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Forgot Password - unknown email gives the same response",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201 (no user enumeration)', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('same generic message', () => pm.expect(body.message).to.eql('If that email exists, a reset link has been sent'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/forgot-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nobody-{{$timestamp}}@test.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reset Password - invalid token is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"not-a-real-token\",\n  \"new_password\": \"newpassword123\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{access_token}}"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Get Me - unauthenticated is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/users/me",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Get Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('email matches registered user', () => pm.expect(body.email).to.eql(pm.environment.get('user_email')));",
+                  "pm.test('password_hash is never returned', () => pm.expect(body.password_hash).to.be.undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/users/me"
+          }
+        },
+        {
+          "name": "Update Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('fields were updated', () => {",
+                  "  pm.expect(body.age).to.eql(28);",
+                  "  pm.expect(body.gender).to.eql('female');",
+                  "  pm.expect(Number(body.height_cm)).to.eql(165);",
+                  "  pm.expect(Number(body.weight_kg)).to.eql(60);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/users/me",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 28,\n  \"gender\": \"female\",\n  \"height_cm\": 165,\n  \"weight_kg\": 60\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Goal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('daily_goal_steps updated', () => pm.expect(body.daily_goal_steps).to.eql(10000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/users/me/goal",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"daily_goal_steps\": 10000\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Goal - zero is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/users/me/goal",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"daily_goal_steps\": 0\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Steps",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{access_token}}"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "Today - before any sync",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set('today_date', new Date().toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('reflects goal set earlier, no steps yet', () => {",
+                  "  pm.expect(body.goal).to.eql(10000);",
+                  "  pm.expect(body.today).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/steps/today"
+          }
+        },
+        {
+          "name": "Sync - unauthenticated is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/steps/sync",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entry_date\": \"{{today_date}}\",\n  \"step_count\": 1000\n}"
+            }
+          }
+        },
+        {
+          "name": "Sync - negative step_count is rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/steps/sync",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entry_date\": \"{{today_date}}\",\n  \"step_count\": -5\n}"
+            }
+          }
+        },
+        {
+          "name": "Sync",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('entry matches what was sent', () => {",
+                  "  pm.expect(body.entry_date).to.eql(pm.environment.get('today_date'));",
+                  "  pm.expect(body.step_count).to.eql(4200);",
+                  "});",
+                  "pm.environment.set('first_sync_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/steps/sync",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entry_date\": \"{{today_date}}\",\n  \"step_count\": 4200\n}"
+            }
+          }
+        },
+        {
+          "name": "Sync - same day again upserts, does not duplicate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('same row was updated, not a new one', () => pm.expect(body.id).to.eql(pm.environment.get('first_sync_id')));",
+                  "pm.test('step_count overwritten', () => pm.expect(body.step_count).to.eql(9000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/steps/sync",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entry_date\": \"{{today_date}}\",\n  \"step_count\": 9000\n}"
+            }
+          }
+        },
+        {
+          "name": "Today - after sync",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('today reflects the last synced value', () => pm.expect(body.today).to.eql(9000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/steps/today"
+          }
+        },
+        {
+          "name": "History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('is an array', () => pm.expect(body).to.be.an('array'));",
+                  "const todayEntry = body.find(e => e.entry_date === pm.environment.get('today_date'));",
+                  "pm.test('contains the upserted entry, not two rows for the same day', () => {",
+                  "  pm.expect(todayEntry).to.not.be.undefined;",
+                  "  pm.expect(todayEntry.step_count).to.eql(9000);",
+                  "  pm.expect(body.filter(e => e.entry_date === pm.environment.get('today_date')).length).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/steps/history?days=30"
+          }
+        },
+        {
+          "name": "Report (weekly)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('totals include the synced entry', () => {",
+                  "  pm.expect(body.period_days).to.eql(7);",
+                  "  pm.expect(body.total_steps).to.be.at.least(9000);",
+                  "  pm.expect(body.avg_daily_steps).to.eql(Math.round(body.total_steps / body.days_logged));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/steps/report?days=7"
+          }
+        },
+        {
+          "name": "Report (monthly)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('period_days reflects query param', () => pm.expect(body.period_days).to.eql(30));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/steps/report?days=30"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{access_token}}"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "List",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is an array (nothing generates notifications server-side yet)', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/notifications"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Overview - regular user is forbidden",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/overview",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Login as Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('has access_token', () => pm.expect(body.access_token).to.be.a('string'));",
+                  "pm.test('role is admin', () => pm.expect(body.user.role).to.eql('admin'));",
+                  "pm.environment.set('admin_access_token', body.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Overview",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/overview",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('all headline fields are numeric', () => {",
+                  "  ['total_users','new_users_today','new_users_7d','new_users_30d','active_users_7d','active_users_30d','total_steps_logged','avg_daily_steps_7d','goal_completion_rate_7d'].forEach(k => {",
+                  "    pm.expect(body[k], k).to.be.a('number');",
+                  "  });",
+                  "});",
+                  "pm.test('total_users includes the test user', () => pm.expect(body.total_users).to.be.at.least(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/users?page=1&limit=20&search=",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('paginated shape', () => {",
+                  "  pm.expect(body.items).to.be.an('array');",
+                  "  pm.expect(body.total).to.be.a('number');",
+                  "  pm.expect(body.page).to.eql(1);",
+                  "  pm.expect(body.limit).to.eql(20);",
+                  "});",
+                  "pm.test('contains the test user', () => pm.expect(body.items.some(u => u.id === pm.environment.get('user_id'))).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "User Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/users/{{user_id}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('matches requested user and includes step_entries', () => {",
+                  "  pm.expect(body.id).to.eql(pm.environment.get('user_id'));",
+                  "  pm.expect(body.step_entries).to.be.an('array').that.is.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "User Detail - unknown id is 404",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/users/00000000-0000-0000-0000-000000000000",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stats: Signups",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/stats/signups?days=30",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('array of {date, count} with real date strings', () => {",
+                  "  pm.expect(body).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(body[0].date).to.match(/^\\d{4}-\\d{2}-\\d{2}$/);",
+                  "  pm.expect(body[0].count).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stats: Steps",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/stats/steps?days=30",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('array of {date, total_steps, active_users} with real date strings', () => {",
+                  "  pm.expect(body).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(body[0].date).to.match(/^\\d{4}-\\d{2}-\\d{2}$/);",
+                  "  pm.expect(body[0].total_steps).to.be.a('number');",
+                  "  pm.expect(body[0].active_users).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update User Status - disable",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/admin/users/{{user_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": false\n}"
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('is_active is now false', () => pm.expect(body.is_active).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - disabled account is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update User Status - re-enable (cleanup)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/admin/users/{{user_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": true\n}"
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_access_token}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('is_active restored to true', () => pm.expect(pm.response.json().is_active).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
